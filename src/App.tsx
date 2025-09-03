@@ -1,0 +1,258 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+// NOTE
+// The previous document accidentally contained non-ASCII punctuation in the top-level file
+// (e.g. Chinese comma '，'). That causes a SyntaxError in JS/TS files.
+// This file is rewritten using only ASCII punctuation in code.
+// UI text can still contain Chinese characters because they are inside strings.
+
+// Helper: inline SVG placeholder cover so we avoid any external network requests by default.
+function svgPlaceholder(title: string) {
+  const safe = encodeURIComponent((title || "Book").slice(0, 18));
+  const svg = `<?xml version='1.0' encoding='UTF-8'?>
+  <svg xmlns='http://www.w3.org/2000/svg' width='300' height='450'>
+    <defs>
+      <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+        <stop offset='0%' stop-color='#e5e7eb'/>
+        <stop offset='100%' stop-color='#cbd5e1'/>
+      </linearGradient>
+    </defs>
+    <rect width='300' height='450' rx='12' ry='12' fill='url(#g)'/>
+    <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle'
+          font-size='20' font-family='Arial, Helvetica, sans-serif' fill='#111827'>${safe}</text>
+    <text x='50%' y='80%' dominant-baseline='middle' text-anchor='middle'
+          font-size='12' font-family='Arial, Helvetica, sans-serif' fill='#374151'>Bookshelf</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${svg}`;
+}
+
+interface Book {
+  id: number;
+  title: string;
+  author: string;
+  cover: string;
+  status: "Reading" | "Finished" | "Wishlist";
+  rating: number;
+}
+
+// Pure function so we can test filter logic.
+function applyFilter(books: Book[], tab: string, q: string) {
+  const term = (q || "").trim().toLowerCase();
+  return books
+    .filter(b => (tab === "All" ? true : b.status === tab))
+    .filter(b => {
+      if (!term) return true;
+      return (
+        (b.title || "").toLowerCase().includes(term) ||
+        (b.author || "").toLowerCase().includes(term)
+      );
+    });
+}
+
+export default function BookshelfApp() {
+  const [filterTab, setFilterTab] = useState("All");
+  const [query, setQuery] = useState("");
+  const [allowExternalImages, setAllowExternalImages] = useState(false);
+  const [books, setBooks] = useState<Book[]>([
+    { id: 1, title: "原子習慣", author: "James Clear", cover: "", status: "Reading", rating: 4 },
+    { id: 2, title: "The Pragmatic Programmer", author: "Andrew Hunt & David Thomas", cover: "", status: "Wishlist", rating: 0 },
+    { id: 3, title: "Deep Work", author: "Cal Newport", cover: "", status: "Finished", rating: 5 }
+  ]);
+
+  const [newBook, setNewBook] = useState({ title: "", author: "", cover: "", status: "Wishlist" as const });
+
+  const filteredBooks = useMemo(() => applyFilter(books, filterTab, query), [books, filterTab, query]);
+
+  const addBook = () => {
+    if (!newBook.title || !newBook.author) return;
+    setBooks(prev => [
+      ...prev,
+      { id: Date.now(), title: newBook.title, author: newBook.author, cover: newBook.cover, status: newBook.status, rating: 0 }
+    ]);
+    setNewBook({ title: "", author: "", cover: "", status: "Wishlist" });
+  };
+
+  const setRating = (id: number, r: number) => {
+    setBooks(prev => prev.map(b => (b.id === id ? { ...b, rating: r } : b)));
+  };
+
+  // Lightweight runtime tests using console.assert so we always have test cases.
+  useEffect(() => {
+    // Test 1: filter by tab
+    const sample: Book[] = [
+      { id: 1, status: "Reading", title: "A", author: "X", cover: "", rating: 0 },
+      { id: 2, status: "Finished", title: "B", author: "Y", cover: "", rating: 0 }
+    ];
+    const t1 = applyFilter(sample, "Reading", "");
+    console.assert(t1.length === 1 && t1[0].status === "Reading", "Test 1 failed: tab filter");
+
+    // Test 2: search by title
+    const t2 = applyFilter(sample, "All", "b");
+    console.assert(t2.length === 1 && t2[0].title === "B", "Test 2 failed: search by title");
+
+    // Test 3: search by author
+    const t3 = applyFilter(sample, "All", "x");
+    console.assert(t3.length === 1 && t3[0].author === "X", "Test 3 failed: search by author");
+  }, []);
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      Reading: "bg-blue-100 text-blue-700",
+      Finished: "bg-green-100 text-green-700",
+      Wishlist: "bg-yellow-100 text-yellow-700"
+    };
+    const cls = map[status] || "bg-slate-100 text-slate-700";
+    return <span className={`px-2 py-1 rounded-full text-xs ${cls}`}>{status}</span>;
+  };
+
+  const Cover = ({ book }: { book: Book }) => {
+    const src = allowExternalImages && book.cover ? book.cover : svgPlaceholder(book.title);
+    return (
+      <img
+        src={src}
+        alt={book.title}
+        className="h-52 w-full object-cover rounded mb-4"
+        onError={(e) => {
+          // Fallback to SVG placeholder if external image fails
+          e.currentTarget.src = svgPlaceholder(book.title);
+        }}
+      />
+    );
+  };
+
+  const Stars = ({ value, onChange }: { value: number; onChange: (rating: number) => void }) => {
+    const stars = [1, 2, 3, 4, 5];
+    return (
+      <div className="mt-2 select-none">
+        {stars.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className="text-lg"
+            aria-label={`rate ${s}`}
+            onClick={() => onChange(s)}
+          >
+            {s <= value ? "★" : "☆"}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+        <h1 className="text-3xl font-bold">📚 我的書架</h1>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="搜尋書名或作者..."
+            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={allowExternalImages}
+              onChange={(e) => setAllowExternalImages(e.target.checked)}
+            />
+            允許外部封面
+          </label>
+        </div>
+      </header>
+
+      <div className="mb-6">
+        <div className="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500">
+          <button
+            className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
+              filterTab === "All" ? "bg-white text-gray-900 shadow-sm" : "hover:bg-gray-200"
+            }`}
+            onClick={() => setFilterTab("All")}
+          >
+            全部
+          </button>
+          <button
+            className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
+              filterTab === "Reading" ? "bg-white text-gray-900 shadow-sm" : "hover:bg-gray-200"
+            }`}
+            onClick={() => setFilterTab("Reading")}
+          >
+            再讀
+          </button>
+          <button
+            className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
+              filterTab === "Finished" ? "bg-white text-gray-900 shadow-sm" : "hover:bg-gray-200"
+            }`}
+            onClick={() => setFilterTab("Finished")}
+          >
+            已讀
+          </button>
+          <button
+            className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
+              filterTab === "Wishlist" ? "bg-white text-gray-900 shadow-sm" : "hover:bg-gray-200"
+            }`}
+            onClick={() => setFilterTab("Wishlist")}
+          >
+            想讀
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white text-gray-950 shadow-sm mb-6">
+        <div className="p-4 grid gap-3">
+          <input
+            type="text"
+            placeholder="書名"
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={newBook.title}
+            onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
+          />
+          <input
+            type="text"
+            placeholder="作者"
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={newBook.author}
+            onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
+          />
+          <input
+            type="text"
+            placeholder="封面圖片 URL (可留空)"
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={newBook.cover}
+            onChange={(e) => setNewBook({ ...newBook, cover: e.target.value })}
+          />
+          <select
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={newBook.status}
+            onChange={(e) => setNewBook({ ...newBook, status: e.target.value as any })}
+          >
+            <option value="Reading">再讀</option>
+            <option value="Finished">已讀</option>
+            <option value="Wishlist">想讀</option>
+          </select>
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={addBook}
+          >
+            新增書籍
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {filteredBooks.map((book) => (
+          <div key={book.id} className="rounded-lg border border-gray-200 bg-white text-gray-950 shadow-sm hover:shadow-xl transition">
+            <div className="p-4 flex flex-col">
+              <Cover book={book} />
+              <h2 className="font-semibold text-lg mb-1">{book.title}</h2>
+              <p className="text-gray-600 text-sm mb-2">{book.author}</p>
+              {statusBadge(book.status)}
+              <Stars value={book.rating || 0} onChange={(r) => setRating(book.id, r)} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

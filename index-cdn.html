@@ -76,6 +76,13 @@
                 setBooks(prev => prev.map(b => (b.id === id ? { ...b, rating: r } : b)));
             };
 
+            // 新增刪除書籍功能
+            const deleteBook = (id) => {
+                if (window.confirm("確定要刪除這本書嗎？")) {
+                    setBooks(prev => prev.filter(b => b.id !== id));
+                }
+            };
+
             // Lightweight runtime tests using console.assert so we always have test cases.
             useEffect(() => {
                 // Test 1: filter by tab
@@ -201,36 +208,63 @@
 
                     <div className="rounded-lg border border-gray-200 bg-white text-gray-950 shadow-sm mb-6">
                         <div className="p-4 grid gap-3">
-                            <input
-                                type="text"
-                                placeholder="書名"
-                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={newBook.title}
-                                onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
-                            />
-                            <input
-                                type="text"
-                                placeholder="作者"
-                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={newBook.author}
-                                onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
-                            />
-                            <input
-                                type="text"
-                                placeholder="封面圖片 URL (可留空)"
-                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={newBook.cover}
-                                onChange={(e) => setNewBook({ ...newBook, cover: e.target.value })}
-                            />
-                            <select
-                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={newBook.status}
-                                onChange={(e) => setNewBook({ ...newBook, status: e.target.value })}
-                            >
-                                <option value="Reading">再讀</option>
-                                <option value="Finished">已讀</option>
-                                <option value="Wishlist">想讀</option>
-                            </select>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">書名 *</label>
+                                <input
+                                    type="text"
+                                    placeholder="請輸入書名"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    defaultValue=""
+                                    onInput={(e) => {
+                                        console.log("📖 書名輸入框 onInput 觸發:", e.target.value);
+                                        setNewBook(prev => ({ ...prev, title: e.target.value }));
+                                    }}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">作者 *</label>
+                                <input
+                                    type="text"
+                                    placeholder="請輸入作者"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    defaultValue=""
+                                    onInput={(e) => {
+                                        console.log("👤 作者輸入框 onInput 觸發:", e.target.value);
+                                        setNewBook(prev => ({ ...prev, author: e.target.value }));
+                                    }}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">封面圖片 URL (可留空)</label>
+                                <input
+                                    type="text"
+                                    placeholder="請輸入封面圖片網址"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    defaultValue=""
+                                    onInput={(e) => {
+                                        console.log("🖼️ 封面輸入框 onInput 觸發:", e.target.value);
+                                        setNewBook(prev => ({ ...prev, cover: e.target.value }));
+                                    }}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">狀態</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    defaultValue="Wishlist"
+                                    onChange={(e) => {
+                                        console.log("📊 狀態選擇框 onChange 觸發:", e.target.value);
+                                        setNewBook(prev => ({ ...prev, status: e.target.value }));
+                                    }}
+                                >
+                                    <option value="Reading">再讀</option>
+                                    <option value="Finished">已讀</option>
+                                    <option value="Wishlist">想讀</option>
+                                </select>
+                            </div>
                             <button
                                 className="inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 onClick={addBook}
@@ -242,7 +276,17 @@
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {filteredBooks.map((book) => (
-                            <div key={book.id} className="rounded-lg border border-gray-200 bg-white text-gray-950 shadow-sm hover:shadow-xl transition">
+                            <div key={book.id} className="rounded-lg border border-gray-200 bg-white text-gray-950 shadow-sm hover:shadow-xl transition relative">
+                                {/* 刪除按鈕 - 位於卡片右上角 */}
+                                <button
+                                    onClick={() => deleteBook(book.id)}
+                                    className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold transition-colors z-10"
+                                    title="刪除書籍"
+                                    aria-label="刪除書籍"
+                                >
+                                    ×
+                                </button>
+
                                 <div className="p-4 flex flex-col">
                                     <Cover book={book} />
                                     <h2 className="font-semibold text-lg mb-1">{book.title}</h2>
